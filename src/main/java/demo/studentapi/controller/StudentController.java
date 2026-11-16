@@ -1,93 +1,115 @@
 package demo.studentapi.controller;
 
+import demo.studentapi.model.Student;
+import demo.studentapi.service.StudentService;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 学生接口。
+ * 学生接口（Controller 层）。
  *
- * @RestController = @Controller + @ResponseBody
- *                   返回值自动转成 JSON
+ * 职责边界：
+ *   ✅ 接 HTTP 请求、解析参数、返回响应
+ *   ✅ 把业务异常转成合适的状态码
+ *   ❌ 不写 SQL
+ *   ❌ 不写业务规则（校验、查重都在 Service）
  */
 @RestController
 @RequestMapping("/api")
 public class StudentController {
 
-    /** W8 先用内存数据，W9 再接数据库 */
-    private final List<Map<String, Object>> students = List.of(
-            Map.of("id", "001", "name", "张三", "chinese", 85, "math", 92, "english", 78),
-            Map.of("id", "002", "name", "李四", "chinese", 99, "math", 62, "english", 75),
-            Map.of("id", "003", "name", "王五", "chinese", 58, "math", 58, "english", 58)
-    );
+    private final StudentService studentService;
 
-    /** GET /api/hello */
+    /** 构造器注入：Spring 启动时自动把 Service 传进来 */
+    public StudentController(StudentService studentService) {
+        this.studentService = studentService;
+    }
+
+    // ==================== 读接口 ====================
+
+    /** GET /api/hello/卢宇轩 */
     @GetMapping("/hello/{name}")
     public String hello(@PathVariable String name) {
         return "Hello," + name;
     }
 
-    /** GET /api/students —— 返回全部学生 */
+    /** GET /api/students —— 查全部 */
     @GetMapping("/students")
-    public List<Map<String, Object>> list() {
-        return students;
+    public List<Student> list() {
+        return studentService.findAll();
     }
 
-    /** GET /api/students/count —— 查数量 */
+    /** GET /api/students/count —— 查总数 */
     @GetMapping("/students/count")
     public int count() {
-        return students.size();
+        return studentService.findAll().size();
     }
 
-    /** GET /api/students/failing —— 返回有不及格科目的学生 */
-    @GetMapping("/students/failing")
-    public List<Map<String, Object>> failing() {
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        for (Map<String, Object> m : students) {
-            int chinese = (int) m.get("chinese");
-            int math    = (int) m.get("math");
-            int english = (int) m.get("english");
-
-            if (chinese < 60 || math < 60 || english < 60) {
-                result.add(m);
-            }
-        }
-        return result;
-    }
-
-    /** GET /api/statistics —— 返回统计信息 */
+    /** GET /api/statistics —— 统计信息 */
     @GetMapping("/statistics")
     public Map<String, Object> statistics() {
-        int count = students.size();
-
-        double avgChinese = students.stream()
-                .mapToInt(s -> (int) s.get("chinese"))
-                .average()
-                .orElse(0);
-
-        int maxMath = students.stream()
-                .mapToInt(s -> (int) s.get("math"))
-                .max()
-                .orElse(0);
-
-        return Map.of(
-                "count", count,
-                "avgChinese", Math.round(avgChinese * 100) / 100.0,
-                "maxMath", maxMath);
+        return studentService.statistics();
     }
 
-    /** GET /api/students/001 —— 路径参数 */
+    /** GET /api/students/failing —— 有不及格科目的学生 */
+    @GetMapping("/students/failing")
+    public List<Student> failing() {
+        return studentService.findAll().stream()
+                .filter(s -> s.getChinese() < 60 || s.getMath() < 60 || s.getEnglish() < 60)
+                .toList();
+    }
+
+    /** GET /api/students/001 —— 查单个，查不到返回 404 */
     @GetMapping("/students/{id}")
-    public Map<String, Object> getById(@PathVariable String id) {
-        return students.stream()
-                .filter(s -> s.get("id").equals(id))
-                .findFirst()
-                .orElse(Map.of("error", "未找到学号为 " + id + " 的学生"));
+    public Student getById(@PathVariable String id) {
+        Student student = studentService.findById(id);
+        if (student == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "未找到学号为 " + id + " 的学生");
+        }
+        return student;
+    }
+
+    // ==================== 写接口 ====================
+
+    /** POST /api/students —— 新增 */
+    @PostMapping("/students")
+    public Student create(@RequestBody Student student) {
+        return studentService.create(student);
+    }
+
+    /** PUT /api/students/001 —— 修改（id 以路径为准） */
+    @PutMapping("/students/{id}")
+    public Student update(@PathVariable String id, @RequestBody Student student) {
+        return studentService.update(id, student);
+    }
+
+    /** DELETE /api/students/001 —— 删除 */
+    @DeleteMapping("/students/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable String id) {
+        studentService.delete(id);
+    }
+
+    // ==================== 统一异常处理 ====================
+
+    /** Service 抛出的业务异常（校验失败、记录不存在）→ HTTP 400 */
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> handleBadRequest(IllegalArgumentException e) {
+        return Map.of("error", e.getMessage());
     }
 }

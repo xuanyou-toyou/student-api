@@ -35,6 +35,19 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
+        <!-- 数据库访问：自带 JdbcTemplate + 连接池（HikariCP） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!-- MySQL 驱动 -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- 开发热部署：改完代码自动重启（约 2 秒），生产打包时自动排除 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
