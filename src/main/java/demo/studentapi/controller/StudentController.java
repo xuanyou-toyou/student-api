@@ -2,6 +2,8 @@ package demo.studentapi.controller;
 
 import demo.studentapi.model.Student;
 import demo.studentapi.service.StudentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -27,6 +29,7 @@ import java.util.Map;
  *   ❌ 不写 SQL
  *   ❌ 不写业务规则（校验、查重都在 Service）
  */
+@Tag(name = "学生管理", description = "学生的增删改查、统计与批量导入")
 @RestController
 @RequestMapping("/api")
 public class StudentController {
@@ -47,24 +50,28 @@ public class StudentController {
     }
 
     /** GET /api/students —— 查全部 */
+    @Operation(summary = "查询全部学生")
     @GetMapping("/students")
     public List<Student> list() {
         return studentService.findAll();
     }
 
     /** GET /api/students/count —— 查总数 */
+    @Operation(summary = "统计学生数量")
     @GetMapping("/students/count")
     public int count() {
         return studentService.findAll().size();
     }
 
     /** GET /api/statistics —— 统计信息 */
+    @Operation(summary = "成绩统计", description = "总人数、语文平均分、数学最高分")
     @GetMapping("/statistics")
     public Map<String, Object> statistics() {
         return studentService.statistics();
     }
 
     /** GET /api/students/failing —— 有不及格科目的学生 */
+    @Operation(summary = "查询有不及格科目的学生")
     @GetMapping("/students/failing")
     public List<Student> failing() {
         return studentService.findAll().stream()
@@ -73,6 +80,7 @@ public class StudentController {
     }
 
     /** GET /api/students/001 —— 查单个，查不到返回 404 */
+    @Operation(summary = "按学号查询单个学生", description = "查不到返回 404")
     @GetMapping("/students/{id}")
     public Student getById(@PathVariable String id) {
         Student student = studentService.findById(id);
@@ -86,18 +94,33 @@ public class StudentController {
     // ==================== 写接口 ====================
 
     /** POST /api/students —— 新增 */
+    @Operation(summary = "新增学生", description = "学号重复或成绩越界返回 400")
     @PostMapping("/students")
     public Student create(@RequestBody Student student) {
         return studentService.create(student);
     }
 
     /** PUT /api/students/001 —— 修改（id 以路径为准） */
+    @Operation(summary = "修改学生", description = "学号以路径参数为准")
     @PutMapping("/students/{id}")
     public Student update(@PathVariable String id, @RequestBody Student student) {
         return studentService.update(id, student);
     }
 
+    /**
+     * POST /api/students/batch —— 批量导入。
+     *
+     * 事务在 Service 层（batchImport 上有 @Transactional），
+     * Controller 只负责把请求体转成 List 传下去。
+     */
+    @Operation(summary = "批量导入", description = "任何一条失败则全部回滚")
+    @PostMapping("/students/batch")
+    public Map<String, Object> batchImport(@RequestBody List<Student> students) {
+        return studentService.batchImport(students);
+    }
+
     /** DELETE /api/students/001 —— 删除 */
+    @Operation(summary = "删除学生", description = "成功返回 204")
     @DeleteMapping("/students/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {

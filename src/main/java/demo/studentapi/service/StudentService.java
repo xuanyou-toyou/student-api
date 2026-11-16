@@ -2,7 +2,10 @@ package demo.studentapi.service;
 
 import demo.studentapi.dao.StudentDao;
 import demo.studentapi.model.Student;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -21,6 +24,21 @@ import java.util.Map;
  */
 @Service
 public class StudentService {
+
+    /**
+     * 日志对象。
+     *
+     * 为什么用 static final：
+     *   - static：每个类一份，不随对象创建而重复
+     *   - final ：初始化后不再变
+     *
+     * 为什么用 SLF4J 而不是 System.out：
+     *   - 有级别（debug / info / warn / error），可以按级别过滤
+     *   - 自动带时间、线程、类名
+     *   - 可以配置输出到文件、按天切分
+     *   - 用 {} 占位符，日志级别不够时不会执行字符串拼接
+     */
+    private static final Logger log = LoggerFactory.getLogger(StudentService.class);
 
     private final StudentDao studentDao;
 
@@ -61,11 +79,15 @@ public class StudentService {
      */
     public Student create(Student student) {
         // TODO 9
+        log.debug("收到新增学生请求: {}", student);
+
         // ① 参数校验（最便宜，最先做）
         if (student.getId() == null || student.getId().isEmpty()) {
+            log.warn("新增失败：学号为空");
             throw new IllegalArgumentException("学号不能为空");
         }
         if (student.getName() == null || student.getName().isEmpty()) {
+            log.warn("新增失败：姓名为空, id={}", student.getId());
             throw new IllegalArgumentException("姓名不能为空");
         }
 
@@ -73,19 +95,23 @@ public class StudentService {
         if (student.getChinese() > 100 || student.getChinese() < 0
                 || student.getMath() > 100 || student.getMath() < 0
                 || student.getEnglish() > 100 || student.getEnglish() < 0) {
+            log.warn("新增失败：成绩越界, id={}, chinese={}, math={}, english={}",
+                    student.getId(), student.getChinese(), student.getMath(), student.getEnglish());
             throw new IllegalArgumentException("成绩必须在 0-100 之间");
         }
 
         // ③ 唯一性校验（要查数据库，放后面）
         if (findById(student.getId()) != null) {
+            log.warn("新增失败：学号已存在, id={}", student.getId());
             throw new IllegalArgumentException("学号 " + student.getId() + " 已存在");
         }
 
         // ④ 写库
         if (!studentDao.insert(student)) {
+            log.error("新增失败：数据库写入失败, id={}", student.getId());
             throw new IllegalStateException("添加失败，请稍后重试");
         }
-        System.out.println("学生添加成功：" + student.getId());
+        log.info("新增学生成功: id={}, name={}", student.getId(), student.getName());
         return student;
     }
 
@@ -102,8 +128,11 @@ public class StudentService {
      */
     public Student update(String id, Student student) {
         // TODO 10
+        log.debug("收到修改学生请求: id={}, body={}", id, student);
+
         // ① 参数校验（便宜的先做）
         if (student.getName() == null || student.getName().isEmpty()) {
+            log.warn("修改失败：姓名为空, id={}", id);
             throw new IllegalArgumentException("姓名不能为空");
         }
 
@@ -111,20 +140,24 @@ public class StudentService {
         if (student.getChinese() > 100 || student.getChinese() < 0
                 || student.getMath() > 100 || student.getMath() < 0
                 || student.getEnglish() > 100 || student.getEnglish() < 0) {
+            log.warn("修改失败：成绩越界, id={}", id);
             throw new IllegalArgumentException("成绩必须在 0-100 之间");
         }
 
         // ③ 存在性校验（要查数据库，放后面）
         if (findById(id) == null) {
+            log.warn("修改失败：学号不存在, id={}", id);
             throw new IllegalArgumentException("未找到学号为 " + id + " 的学生");
         }
 
         // ④ 写库
         if (!studentDao.update(id, student)) {
+            log.error("修改失败：数据库写入失败, id={}", id);
             throw new IllegalStateException("更新失败，请稍后重试");
         }
         // 返回给前端的对象补上 id，让响应完整（请求体里本来就没有 id）
         student.setId(id);
+        log.info("修改学生成功: id={}, name={}", id, student.getName());
         return student;
     }
 
@@ -136,10 +169,53 @@ public class StudentService {
      */
     public void delete(String id) {
         // TODO 11
+        log.debug("收到删除学生请求: id={}", id);
         if (findById(id) == null) {
+            log.warn("删除失败：学号不存在, id={}", id);
             throw new IllegalArgumentException("未找到学号为 " + id + " 的学生");
         }
         studentDao.deleteById(id);
+        log.info("删除学生成功: id={}", id);
+    }
+
+    // ============================================================
+    //  批量导入（事务演示）
+    // ============================================================
+    /**
+     * 批量导入学生 —— 要么全部成功，要么全部回滚。
+     *
+     * @Transactional 的三个要点：
+     *
+     *   1) 加在 Service 上，不是 Controller
+     *      Spring 的事务是「方法级切面」，加在 Controller 上也能生效，
+     *      但事务边界应该包住「业务操作」而不是「HTTP 请求解析」。
+     *
+     *   2) rollbackFor = Exception.class
+     *      Spring 默认只在遇到 RuntimeException（和 Error）时回滚，
+     *      受检异常（checked exception）不回滚。加上这个参数才保险。
+     *
+     *   3) 内部不要 try-catch 吞掉异常
+     *      异常被 catch 住，Spring 认为方法正常结束 → 提交事务 → 脏数据留下。
+     *      要捕获就捕获后重新抛出，或者标记回滚。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> batchImport(List<Student> students) {
+        if (students == null || students.isEmpty()) {
+            throw new IllegalArgumentException("导入列表不能为空");
+        }
+
+        log.info("开始批量导入: 共 {} 条", students.size());
+
+        int success = 0;
+        for (Student student : students) {
+            // 这里刻意不写 try-catch：
+            // 任何一条失败，异常向上抛出 → 事务回滚 → 之前插入的全部撤销
+            create(student);
+            success++;
+        }
+
+        log.info("批量导入完成: 成功 {} 条", success);
+        return Map.of("imported", success);
     }
 
     // ============================================================

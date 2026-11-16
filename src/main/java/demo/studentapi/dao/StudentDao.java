@@ -1,6 +1,8 @@
 package demo.studentapi.dao;
 
 import demo.studentapi.model.Student;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -25,6 +27,8 @@ import java.util.List;
  */
 @Repository
 public class StudentDao {
+
+    private static final Logger log = LoggerFactory.getLogger(StudentDao.class);
 
     /** Spring 会自动注入一个可用的 JdbcTemplate（因为配好了数据源） */
     private final JdbcTemplate jdbcTemplate;
@@ -120,9 +124,11 @@ public class StudentDao {
     public boolean insert(Student student) {
         // TODO 3 写在这里
         String sql = "INSERT INTO student (id, name, chinese, math, english) VALUES (?, ?, ?, ?, ?)";
+        log.debug("执行 INSERT: id={}", student.getId());
         int row = jdbcTemplate.update(sql,
                 student.getId(), student.getName(),
                 student.getChinese(),student.getMath(), student.getEnglish());
+        log.debug("INSERT 影响行数: {}", row);
         return row > 0;
     }
 
@@ -137,10 +143,12 @@ public class StudentDao {
     public boolean update(String id, Student student) {
         // TODO 4 写在这里
         String sql = "UPDATE student SET name = ?, chinese = ?, math = ?, english = ? WHERE id = ?";
+        log.debug("执行 UPDATE: id={}", id);
         int row = jdbcTemplate.update(sql,
                 student.getName(),
                 student.getChinese(), student.getMath(), student.getEnglish(),
                 id);
+        log.debug("UPDATE 影响行数: {}", row);
         return row > 0;
     }
 
@@ -153,7 +161,9 @@ public class StudentDao {
     public boolean deleteById(String id) {
         // TODO 5 写在这里
         String sql = "DELETE FROM student WHERE id = ?";
+        log.debug("执行 DELETE: id={}", id);
         int row = jdbcTemplate.update(sql, id);
+        log.debug("DELETE 影响行数: {}", row);
         return row > 0;
     }
 
