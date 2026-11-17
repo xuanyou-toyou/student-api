@@ -178,45 +178,6 @@ public class StudentService {
         log.info("删除学生成功: id={}", id);
     }
 
-    // ============================================================
-    //  批量导入（事务演示）
-    // ============================================================
-    /**
-     * 批量导入学生 —— 要么全部成功，要么全部回滚。
-     *
-     * @Transactional 的三个要点：
-     *
-     *   1) 加在 Service 上，不是 Controller
-     *      Spring 的事务是「方法级切面」，加在 Controller 上也能生效，
-     *      但事务边界应该包住「业务操作」而不是「HTTP 请求解析」。
-     *
-     *   2) rollbackFor = Exception.class
-     *      Spring 默认只在遇到 RuntimeException（和 Error）时回滚，
-     *      受检异常（checked exception）不回滚。加上这个参数才保险。
-     *
-     *   3) 内部不要 try-catch 吞掉异常
-     *      异常被 catch 住，Spring 认为方法正常结束 → 提交事务 → 脏数据留下。
-     *      要捕获就捕获后重新抛出，或者标记回滚。
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> batchImport(List<Student> students) {
-        if (students == null || students.isEmpty()) {
-            throw new IllegalArgumentException("导入列表不能为空");
-        }
-
-        log.info("开始批量导入: 共 {} 条", students.size());
-
-        int success = 0;
-        for (Student student : students) {
-            // 这里刻意不写 try-catch：
-            // 任何一条失败，异常向上抛出 → 事务回滚 → 之前插入的全部撤销
-            create(student);
-            success++;
-        }
-
-        log.info("批量导入完成: 成功 {} 条", success);
-        return Map.of("imported", success);
-    }
 
     // ============================================================
     //  TODO 12：统计（多个 DAO 结果组合）
@@ -244,5 +205,18 @@ public class StudentService {
         double avgChinese = list.stream().mapToInt(Student::getChinese).average().orElse(0);
         int maxMath = list.stream().mapToInt(Student::getMath).max().orElse(0);
         return Map.of("count", count, "avgChinese", Math.round(avgChinese * 100) / 100.0,"maxMath", maxMath);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> batchImport(List<Student> students){
+        if (students == null || students.isEmpty()) {
+            throw new IllegalArgumentException("导入列表不能为空");
+        }
+        log.info("开始批量导入: 共 {} 条", students.size());
+        for (Student s : students) {
+            create(s);
+        }
+        log.info("批量导入成功: 共 {} 条", students.size());
+        return Map.of("imported", students.size());
     }
 }

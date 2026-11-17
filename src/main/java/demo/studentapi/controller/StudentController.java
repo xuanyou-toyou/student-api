@@ -100,6 +100,13 @@ public class StudentController {
         return studentService.create(student);
     }
 
+    /** POST /api/students/batch —— 批量导入，任何一条失败则全部回滚 */
+    @Operation(summary = "批量导入", description = "任何一条失败则全部回滚")
+    @PostMapping("/students/batch")
+    public Map<String, Object> batchImport(@RequestBody List<Student> students) {
+        return studentService.batchImport(students);
+    }
+
     /** PUT /api/students/001 —— 修改（id 以路径为准） */
     @Operation(summary = "修改学生", description = "学号以路径参数为准")
     @PutMapping("/students/{id}")
@@ -107,17 +114,6 @@ public class StudentController {
         return studentService.update(id, student);
     }
 
-    /**
-     * POST /api/students/batch —— 批量导入。
-     *
-     * 事务在 Service 层（batchImport 上有 @Transactional），
-     * Controller 只负责把请求体转成 List 传下去。
-     */
-    @Operation(summary = "批量导入", description = "任何一条失败则全部回滚")
-    @PostMapping("/students/batch")
-    public Map<String, Object> batchImport(@RequestBody List<Student> students) {
-        return studentService.batchImport(students);
-    }
 
     /** DELETE /api/students/001 —— 删除 */
     @Operation(summary = "删除学生", description = "成功返回 204")
