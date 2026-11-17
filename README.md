@@ -34,7 +34,7 @@ src/main/java/demo/studentapi/
 └── model/Student.java                实体
 
 src/test/java/demo/studentapi/
-└── service/StudentServiceTest.java   单元测试（17 个用例，Mockito 隔离 DAO）
+└── service/StudentServiceTest.java   单元测试（6 个用例，Mockito 隔离 DAO）
 ```
 
 ### 三层架构
@@ -144,7 +144,7 @@ curl -X POST http://localhost:8080/api/students/batch \
 mvn test
 ```
 
-17 个单元测试，覆盖：
+6 个单元测试（毫秒级完成，不连数据库），覆盖：
 
 - 参数校验（学号/姓名非空、成绩范围）
 - 业务规则（学号重复拒绝、修改时 id 以路径为准）
